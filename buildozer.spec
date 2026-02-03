@@ -32,7 +32,6 @@ android.logcat_filters = *:S python:D kivy:D
 android.api = 34
 android.minapi = 21
 android.ndk = 25b
-android.sdk = 24
 
 # Architectures (use arm64 only if you want smaller build)
 android.archs = arm64-v8a,armeabi-v7a
@@ -46,4 +45,5 @@ android.add_src = .
 [buildozer]
 log_level = 2
 warn_on_root = 1
+
 
