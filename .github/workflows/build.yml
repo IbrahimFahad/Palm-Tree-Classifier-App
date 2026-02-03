@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Set up Java 17 (required by sdkmanager)
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -49,41 +49,49 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildozer-
 
-      - name: Set up Android SDK
+      # Install Android cmdline-tools + sdkmanager (modern)
+      - name: Set up Android SDK (cmdline-tools)
         uses: android-actions/setup-android@v3
 
-      - name: Install SDK packages + accept licenses
+      - name: Accept licenses + install required packages
         run: |
           set -e
+          echo "JAVA_HOME=$JAVA_HOME"
           java -version
+
+          # Ensure we use modern sdkmanager
+          which sdkmanager
           sdkmanager --version
+
           yes | sdkmanager --licenses
 
-          # Match your buildozer.spec: android.api = 34
           sdkmanager \
             "platform-tools" \
             "platforms;android-34" \
-            "build-tools;34.0.0"
+            "build-tools;34.0.0" \
+            "ndk;25.2.9519653"
 
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -la "$ANDROID_SDK_ROOT/build-tools" || true
+          ls -la "$ANDROID_SDK_ROOT/cmdline-tools" || true
           ls -la "$ANDROID_SDK_ROOT/build-tools/34.0.0" || true
-
-          # Verify aidl exists in the installed SDK
           test -f "$ANDROID_SDK_ROOT/build-tools/34.0.0/aidl"
-          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aidl" --version || true
 
-      - name: Force Buildozer to use runner SDK (fix AIDL not found)
+      - name: Force Buildozer to use runner Android SDK (no old tools/)
         run: |
           set -e
-          # Buildozer/p4a often expects its own SDK under ~/.buildozer
+          # Make buildozer's expected path point to runner SDK
           mkdir -p ~/.buildozer/android/platform
           rm -rf ~/.buildozer/android/platform/android-sdk
           ln -s "$ANDROID_SDK_ROOT" ~/.buildozer/android/platform/android-sdk
 
-          echo "Buildozer SDK path now points to:"
-          ls -la ~/.buildozer/android/platform/
-          ls -la ~/.buildozer/android/platform/android-sdk/build-tools || true
+          # IMPORTANT: prevent old "tools/bin/sdkmanager" usage by ensuring it doesn't exist
+          # If any old tools folder exists, remove it (cmdline-tools is the correct one).
+          rm -rf ~/.buildozer/android/platform/android-sdk/tools || true
+
+          echo "Buildozer SDK points to:"
+          ls -la ~/.buildozer/android/platform/android-sdk
+          echo "sdkmanager used:"
+          which sdkmanager
 
       - name: Install Buildozer
         run: |
@@ -92,8 +100,8 @@ jobs:
 
       - name: Build APK (debug)
         env:
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
           buildozer -v android debug
