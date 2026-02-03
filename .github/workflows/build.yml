@@ -6,61 +6,63 @@ on:
   workflow_dispatch:
 
 jobs:
-  apk:
+  build-apk:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
       - name: Install system dependencies
         run: |
+          set -e
           sudo apt-get update
           sudo apt-get install -y \
-            git zip unzip \
+            git \
+            zip \
+            unzip \
             openjdk-17-jdk \
-            autoconf automake libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
             cmake \
-            libffi-dev libssl-dev \
+            libffi-dev \
+            libssl-dev \
             build-essential \
             libltdl-dev \
-            # Pillow / image deps (important)
-            libjpeg-dev zlib1g-dev libpng-dev
+            libjpeg-dev \
+            libpng-dev
 
-      - name: Cache Buildozer / p4a / Gradle
+      - name: Cache Buildozer & Gradle
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cache/buildozer
             ~/.buildozer
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-buildozer-api34-ndk25b-${{ hashFiles('buildozer.spec') }}
+            ~/.cache/buildozer
+            ~/.gradle
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
             ${{ runner.os }}-buildozer-
 
-      - name: Install Buildozer + pinned Cython
+      - name: Install Buildozer
         run: |
-          python -m pip install --upgrade pip wheel setuptools
-          # Cython pin is the safest for many p4a recipes
-          pip install --upgrade buildozer cython==0.29.36
+          python -m pip install --upgrade pip setuptools wheel
+          pip install buildozer cython==0.29.36
 
       - name: Build APK (debug)
         env:
-          # Helps avoid some toolchain noise; optional
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          # Print the spec so logs show what CI used
-          echo "----- buildozer.spec -----"
-          sed -n '1,200p' buildozer.spec
-          echo "--------------------------"
-
           buildozer -v android debug
 
       - name: Upload APK
