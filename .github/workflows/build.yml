@@ -2,18 +2,18 @@ name: Build Android APK (Buildozer)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
-  build-apk:
+  apk:
     runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -22,38 +22,50 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git zip unzip openjdk-17-jdk \
+            git zip unzip \
+            openjdk-17-jdk \
             autoconf automake libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 \
+            cmake \
             libffi-dev libssl-dev \
-            libstdc++6 \
-            python3-pip python3-setuptools python3-wheel \
             build-essential \
-            libltdl-dev
+            libltdl-dev \
+            # Pillow / image deps (important)
+            libjpeg-dev zlib1g-dev libpng-dev
 
-      - name: Cache Buildozer + Python-for-Android
+      - name: Cache Buildozer / p4a / Gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.cache/buildozer
             ~/.buildozer
-          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-buildozer-api34-ndk25b-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
             ${{ runner.os }}-buildozer-
 
-      - name: Install Buildozer + Cython
+      - name: Install Buildozer + pinned Cython
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip wheel setuptools
+          # Cython pin is the safest for many p4a recipes
           pip install --upgrade buildozer cython==0.29.36
 
       - name: Build APK (debug)
+        env:
+          # Helps avoid some toolchain noise; optional
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
+          # Print the spec so logs show what CI used
+          echo "----- buildozer.spec -----"
+          sed -n '1,200p' buildozer.spec
+          echo "--------------------------"
+
           buildozer -v android debug
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk
+          name: PalmTreeClassifier-APK
           path: bin/*.apk
           if-no-files-found: error
